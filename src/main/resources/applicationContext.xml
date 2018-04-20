@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:oauth2="http://www.springframework.org/schema/security/oauth2"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:jms="http://www.springframework.org/schema/jms"
+	xmlns:cache="http://www.springframework.org/schema/cache" xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xsi:schemaLocation="http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+		http://www.springframework.org/schema/security/oauth2 http://www.springframework.org/schema/security/spring-security-oauth2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+		http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms-4.0.xsd
+		http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache.xsd">
+	<import resource="applicationContext-dubbo.xml" />
+	<!-- 参考配置 -->
+	<!-- component-scan自动搜索@Component , @Controller , @Service , @Repository等标注的类 -->
+	<!-- <context:component-scan base-package="com.bocsoft.bim" /> -->
+	<!-- 1.注解探测器 -->
+	<!-- <context:annotation-config /> -->
+
+	<!-- 定义property配置文件 -->
+	<context:property-placeholder location="classpath:*.properties"
+		ignore-unresolvable="true" />
+
+	<!-- 自定义缓存 -->
+	<bean id="initCache" class="com.wxx.cache.InitCache" init-method="setTheWxxMap" />
+	<bean id="staticMapCache" class="com.wxx.cache.StaticMapCache" />
+	<bean id="weixxCache" class="com.wxx.cache.WeixxCache" />
+	<!-- 自定义过滤器 -->
+	<bean id="dynamicAgent" class="com.wxx.filter.DynamicAgent" />
+	<!-- 随系统启动动态加载自定义过滤器 -->
+	<bean id="systemService" class="com.wxx.service.SystemService" />
+	<!-- <bean id="systemService" class="com.wxx.service.SystemService" init-method="loadFilter" /> -->
+
+
+	<!--spring DBCP连接池 -->
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource"
+		p:driverClassName="com.mysql.jdbc.Driver"
+		p:url="jdbc:mysql://22.188.12.169:3308/containerp801?characterEncoding=UTF-8"
+		p:username="admin" p:password="adminadmin">
+	</bean>
+
+
+	<!-- 事务管理器 -->
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!--mybatis两大核心bean -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!--dataSource属性指定要用到的连接池 -->
+		<property name="dataSource" ref="dataSource" />
+		<!--configLocation属性指定mybatis的核心配置文件 -->
+		<property name="configLocation" value="classpath:mybatis.xml" />
+		<!-- 所有配置的mapper文件 -->
+		<property name="mapperLocations" value="classpath:mappers/*.xml" />
+	</bean>
+
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<!-- mapper接口 -->
+		<property name="basePackage" value="com.wxx.mapper" />
+	</bean>
+
+
+	<tx:advice id="mybatisTxAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="*" rollback-for="java.lang.Exception"
+				propagation="REQUIRED" />
+			<tx:method name="get*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="find*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="query*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="read*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="load*" read-only="true" propagation="SUPPORTS" />
+		</tx:attributes>
+	</tx:advice>
+
+	<tx:annotation-driven transaction-manager="transactionManager"
+		proxy-target-class="true" />
+
+
+	<import resource="applicationContext-jedis.xml" />
+
+
+
+	<bean name="defaultExceptionHandler" class="com.wxx.exception.handler.impl.DefaultExceptionHandler" />
+	<bean name="exceptionStreamHandler" class="com.wxx.exception.stream.handler.impl.CompositeExceptionStreamHandler" />
+	
+	
+	<bean name="exceptionHandler" class="com.wxx.exception.handler.impl.CompositeExceptionHandler"
+	p:defaultExceptionHandler-ref="defaultExceptionHandler">
+	<property name="exceptionHandlerList">
+		<list>
+			<!-- <bean class="com.wxx.exception.handler.impl.BaseExceptionHandler" /> -->
+			<bean class="com.wxx.exception.handler.impl.HttpMessageNotWritableExceptionHandler" />
+			<bean class="com.wxx.exception.handler.impl.NullPointerExceptionHandler" />
+			<bean class="com.wxx.exception.handler.impl.OutofMaxDatagramExceptionHandler" />
+			<bean class="com.wxx.exception.handler.impl.ThrowableExceptionHandler" />
+			<bean class="com.wxx.exception.handler.impl.ControllerExceptionHandler" />
+		</list>
+	</property>
+	</bean>
+	
+	<!-- 全局异常配置 start -->
+	<bean id="handlerExceptionResolver"
+		class="com.wxx.exception.handler.WeixxExceptionHandlerResolver"
+		p:exceptionHandler-ref="exceptionHandler"
+		p:exceptionStreamHandler-ref="exceptionStreamHandler" />
+	<!-- 全局异常配置 end -->
+
+
+</beans>

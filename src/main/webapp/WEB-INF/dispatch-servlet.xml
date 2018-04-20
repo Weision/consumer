@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:oxm="http://www.springframework.org/schema/oxm" xmlns:sec="http://www.springframework.org/schema/security"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/oxm http://www.springframework.org/schema/oxm/spring-oxm-4.0.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
+		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+
+	<!-- 开启注解 -->
+	<mvc:annotation-driven />
+
+	<!-- 扫描包路径 -->
+	<context:component-scan base-package="com.wxx.controller" />
+	<context:component-scan base-package="com.wxx.service" />
+	<context:component-scan base-package="com.wxx.mapper" />
+	<!-- <context:component-scan base-package="com.wxx.exceptionHandler" /> -->
+
+
+
+	<!-- 定义静态资源 -->
+	<!-- <mvc:resources mapping="/static/**" location="/WEB-INF/static/" /> -->
+	<mvc:resources mapping="/static/**" location="./static/" />
+	<mvc:default-servlet-handler />
+
+	<!-- 配置拦截器 -->
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/**" />
+			<bean class="com.wxx.interceptor.SessionIntercptor" />
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+	<bean
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix">
+			<value>/WEB-INF/pages/</value>
+		</property>
+		<property name="suffix">
+			<value>.jsp</value>
+		</property>
+	</bean>
+
+	<!-- 处理json -->
+
+	<mvc:annotation-driven>
+		<mvc:message-converters>
+			<bean
+				class="org.springframework.http.converter.ResourceHttpMessageConverter"></bean>
+			<bean
+				class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+				<property name="supportedMediaTypes">
+					<list>
+						<value>text/html;charset=UTF-8</value>
+						<value>application/json;charset=UTF-8</value>
+					</list>
+				</property>
+			</bean>
+		</mvc:message-converters>
+	</mvc:annotation-driven>
+
+
+	<!-- 组合模式 分支1  配置公共的contonllerr -->
+	<util:list id="commonControllerList">
+		<bean class="com.wxx.composite.controller.GodFatherController" />
+		<bean class="com.wxx.composite.controller.StudentController" />
+		<bean class="com.wxx.composite.controller.TeacherController" />
+	</util:list>
+	
+	<!-- 组合模式 分支2  配置公共的contonllerr -->
+	<util:list id="commonDubboControllerList">
+		<bean class="com.wxx.controller.RedisController" />
+		<bean class="com.wxx.controller.WxxAnnoController" />
+		<bean class="com.wxx.controller.WxxController" />
+	</util:list>
+
+</beans>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:oauth2="http://www.springframework.org/schema/security/oauth2"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:jms="http://www.springframework.org/schema/jms"
+	xmlns:cache="http://www.springframework.org/schema/cache" xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+	xsi:schemaLocation="http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/security/oauth2 http://www.springframework.org/schema/security/spring-security-oauth2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms.xsd
+		http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache.xsd
+		http://code.alibabatech.com/schema/dubbo http://code.alibabatech.com/schema/dubbo/dubbo.xsd">
+
+	<!-- Application name -->
+	
+	<dubbo:application name="consumer" />  
+	<!-- 端口如果重复可以把端口删除 会随机找个端口 -->
+	<!-- <dubbo:protocol name="dubbo" port="20889" /> -->
+	<dubbo:protocol name="dubbo" />
+	<dubbo:consumer check="false" timeout="60000" retries="0"></dubbo:consumer>
+	<!-- weixx_provider 虚拟提货券 zookeeper地址 22.188.12.156:2181-->
+	<dubbo:registry id="provider" protocol="zookeeper" address="22.11.20.121:2181" />
+
+	<!-- getName start -->
+	<dubbo:reference id="iWeixxService" interface="com.wxx.service.IWeixxService"
+		registry="provider" />
+
+</beans>

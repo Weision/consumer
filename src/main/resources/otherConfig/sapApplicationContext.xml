@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:oauth2="http://www.springframework.org/schema/security/oauth2"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:jms="http://www.springframework.org/schema/jms"
+	xmlns:cache="http://www.springframework.org/schema/cache"
+	xsi:schemaLocation="http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+		http://www.springframework.org/schema/security/oauth2 http://www.springframework.org/schema/security/spring-security-oauth2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+		http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms-4.0.xsd
+		http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache.xsd">
+	<!-- 数据源配置 -->
+	<context:property-placeholder location="classpath:system.properties"
+		ignore-unresolvable="true" />
+
+	<aop:aspectj-autoproxy />
+	<!-- 记录后台交易开始时间、结束时间和交易所用时间 b_system_log -->
+	<bean class="com.bocsoft.sap.base.aspect.SystemLogAspect" />
+
+	<!-- 1、初始化tdg循环标签tdgLoopFlag；2、加载系统参数表b_system_properties -->
+	<bean id="systemProperty" class="com.bocsoft.sap.framework.constant.SystemProperty"
+		init-method="initTdgLoopFlag" />
+
+	<context:property-placeholder
+		properties-ref="systemProperty" ignore-unresolvable="true" />
+	<!-- 加载其他表 -->
+	<bean id="sapCacheJdbcUtil" class="com.bocsoft.sap.framework.cache.impl.SapCacheJdbcUtil"
+		scope="prototype" />
+	<bean id="sapCacheHolder" depends-on="sapCacheJdbcUtil"
+		class="com.bocsoft.sap.framework.cache.impl.SapCacheHolder" scope="singleton" />
+
+	<bean id="socketClient" class="com.bocsoft.sap.base.handler.SocketClient">
+		<constructor-arg index="0" value="22.11.143.13"></constructor-arg>
+		<constructor-arg index="1" value="12345"></constructor-arg>
+		<constructor-arg index="2" value="5000"></constructor-arg>
+	</bean>
+
+	<bean id="tokenServices"
+		class="org.springframework.security.oauth2.provider.token.DefaultTokenServices"
+		p:tokenStore-ref="tokenService" p:supportRefreshToken="true"
+		p:clientDetailsService-ref="clientService" p:tokenEnhancer-ref="sapTokenEnhancer" />
+	<bean id="sapTokenEnhancer" class="com.bocsoft.sap.base.handler.SapTokenEnhancer" />
+
+	<bean id="emf"
+		class="org.springframework.orm.jpa.LocalEntityManagerFactoryBean"
+		p:persistenceUnitName="sap-unit-access-consumer-war">
+		<property name="jpaDialect">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaDialect" />
+		</property>
+	</bean>
+
+	<bean id="jpaTxManager" class="org.springframework.orm.jpa.JpaTransactionManager"
+		p:entityManagerFactory-ref="emf" />
+
+	<aop:config proxy-target-class="true" expose-proxy="true">
+		<aop:pointcut id="serviceMethods"
+			expression="execution(* com.bocsoft.sap.**.service.impl.*Impl.*(..))" />
+		<aop:advisor advice-ref="jpaTxAdvice" pointcut-ref="serviceMethods" />
+	</aop:config>
+
+	<tx:advice id="jpaTxAdvice" transaction-manager="jpaTxManager">
+		<tx:attributes>
+			<tx:method name="*" rollback-for="java.lang.Exception"
+				propagation="REQUIRED" />
+			<tx:method name="get*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="find*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="query*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="read*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="load*" read-only="true" propagation="SUPPORTS" />
+			<tx:method name="getClientTran" propagation="REQUIRES_NEW"
+				rollback-for="java.lang.Exception" />
+			<tx:method name="getTranLimit" propagation="REQUIRES_NEW"
+				rollback-for="java.lang.Exception" />
+			<tx:method name="updateTranLimitTimes" propagation="REQUIRES_NEW"
+				rollback-for="java.lang.Exception" />
+			<tx:method name="insertTranLimitTimes" propagation="REQUIRES_NEW"
+				rollback-for="java.lang.Exception" />
+		</tx:attributes>
+	</tx:advice>
+
+	<tx:annotation-driven transaction-manager="jpaTxManager"
+		proxy-target-class="true" />
+
+	<context:component-scan base-package="com.bocsoft.sap.**.service" />
+	<context:component-scan base-package="com.bocsoft.sap.**.service.impl" />
+	<context:component-scan base-package="com.bocsoft.sap.**.repository" />
+	<context:component-scan base-package="com.bocsoft.sap.**.protect.impl" />
+	<context:component-scan base-package="com.bocsoft.sap.**.redis" />
+	<!-- JMS Queue Template <bean id="jmsConnectionFactory" class="org.springframework.jms.connection.SingleConnectionFactory"> 
+		<property name="targetConnectionFactory"> <jee:jndi-lookup jndi-name="${jndi.jmsConnectionFactory}" 
+		/> </property> </bean> <bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate" 
+		p:connectionFactory-ref="jmsConnectionFactory" p:receiveTimeout="${mq.receiveTimeout}" 
+		p:pubSubDomain="false"> <property name="destinationResolver"> <bean class="org.springframework.jms.support.destination.JndiDestinationResolver" 
+		/> </property> </bean> <bean id="jmsTxManager" class="org.springframework.jms.connection.JmsTransactionManager" 
+		p:connectionFactory-ref="jmsConnectionFactory" /> <aop:config proxy-target-class="true" 
+		expose-proxy="true"> <aop:pointcut id="sipServiceMethods" expression="execution(* 
+		com.bocsoft.sap.base.service.impl.SipServiceImpl.*(..))" /> <aop:advisor 
+		advice-ref="jmsTxAdvice" pointcut-ref="sipServiceMethods" /> </aop:config> 
+		<tx:advice id="jmsTxAdvice" transaction-manager="jmsTxManager"> <tx:attributes> 
+		<tx:method name="*" rollback-for="java.lang.Exception" propagation="REQUIRED" 
+		/> </tx:attributes> </tx:advice> <tx:annotation-driven transaction-manager="jmsTxManager" 
+		proxy-target-class="true" /> -->
+
+	<bean id="requestDataValueProcessor"
+		class="com.bocsoft.sap.base.handler.SapRequestDataValueProcessor"></bean>
+
+
+	<bean id="qmasService"
+		class="org.springframework.remoting.httpinvoker.HttpInvokerProxyFactoryBean">
+		<property name="serviceInterface" value="com.nantian.qmas.i.CInterface" />
+		<property name="serviceUrl" value="${bsma.QmasService.url}" />
+	</bean>
+
+	<bean id="restTemplate" class="org.springframework.web.client.RestTemplate">
+		<property name="messageConverters">
+			<list>
+				<bean
+					class="org.springframework.http.converter.StringHttpMessageConverter" />
+				<bean class="org.springframework.http.converter.FormHttpMessageConverter" />
+			</list>
+		</property>
+	</bean>
+
+	<bean id="message" class="org.springframework.context.support.StaticMessageSource"></bean>
+
+	<bean id="restTemplate2" class="com.bocsoft.sap.framework.rest.SapRestTemplate">
+		<property name="messageConverters">
+			<list>
+				<bean
+					class="org.springframework.http.converter.StringHttpMessageConverter"
+					p:writeAcceptCharset="false">
+					<constructor-arg>
+						<value>UTF-8</value>
+					</constructor-arg>
+				</bean>
+				<bean class="org.springframework.http.converter.FormHttpMessageConverter" />
+				<bean
+					class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter"
+					p:objectMapper-ref="hibernateAwareObjectMapper" />
+			</list>
+		</property>
+	</bean>
+
+	<bean name="hibernateAwareObjectMapper"
+		class="com.bocsoft.sap.framework.utility.HibernateAwareObjectMapper" />
+
+
+
+	<bean name="defaultExceptionHandler"
+		class="com.bocsoft.sap.framework.handler.impl.DefaultExceptionHandler" />
+	<bean name="exceptionStreamHandler"
+		class="com.bocsoft.sap.framework.handler.impl.CompositeExceptionStreamHandler" />
+	<bean name="exceptionHandler"
+		class="com.bocsoft.sap.framework.handler.impl.CompositeExceptionHandler"
+		p:defaultExceptionHandler-ref="defaultExceptionHandler">
+		<property name="exceptionHandlerList">
+			<list>
+				<bean class="com.bocsoft.sap.framework.handler.impl.BaseExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.HttpMessageNotWritableExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.NullPointerExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.OAuth2ExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.OutofMaxDatagramExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.SAPAuthenticationExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.ThrowableExceptionHandler" />
+				<bean
+					class="com.bocsoft.sap.framework.handler.impl.SAPCheckUserPasswordExceptionHandler" />
+			</list>
+		</property>
+	</bean>
+	<!-- 全局异常配置 start -->
+	<bean id="handlerExceptionResolver"
+		class="com.bocsoft.sap.framework.handler.SapExceptionHandlerResolver"
+		p:exceptionHandler-ref="exceptionHandler"
+		p:exceptionStreamHandler-ref="exceptionStreamHandler" />
+	<!-- 全局异常配置 end -->
+
+
+	<bean id="pcCaptchaProducer" class="com.google.code.kaptcha.impl.DefaultKaptcha">
+		<property name="config">
+			<bean class="com.google.code.kaptcha.util.Config">
+				<constructor-arg type="java.util.Properties">
+					<props>
+						<prop key="kaptcha.image.width">60</prop>
+						<prop key="kaptcha.image.height">29</prop>
+						<prop key="kaptcha.textproducer.char.string">0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+						</prop>
+						<prop key="kaptcha.textproducer.char.length">4</prop>
+						<prop key="kaptcha.textproducer.font.size">20</prop>
+						<prop key="kaptcha.textproducer.char.space">3</prop>
+						<prop key="kaptcha.obscurificator.impl">com.bocsoft.sap.base.captcha.SapGimpy</prop>
+						<prop key="kaptcha.background.impl">com.bocsoft.sap.base.captcha.SapCaptchaBackground
+						</prop>
+						<prop key="kaptcha.word.impl">com.bocsoft.sap.base.captcha.SapWordRenderer</prop>
+					</props>
+				</constructor-arg>
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="mobileCaptchaProducer" class="com.google.code.kaptcha.impl.DefaultKaptcha">
+		<property name="config">
+			<bean class="com.google.code.kaptcha.util.Config">
+				<constructor-arg type="java.util.Properties">
+					<props>
+						<prop key="kaptcha.image.width">60</prop>
+						<prop key="kaptcha.image.height">29</prop>
+						<prop key="kaptcha.textproducer.char.string">0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+						</prop>
+						<prop key="kaptcha.textproducer.char.length">4</prop>
+						<prop key="kaptcha.textproducer.font.size">20</prop>
+						<prop key="kaptcha.textproducer.char.space">3</prop>
+						<prop key="kaptcha.obscurificator.impl">com.bocsoft.sap.base.captcha.SapGimpy</prop>
+						<prop key="kaptcha.background.impl">com.bocsoft.sap.base.captcha.SapCaptchaBackground
+						</prop>
+						<prop key="kaptcha.word.impl">com.bocsoft.sap.base.captcha.SapWordRenderer</prop>
+					</props>
+				</constructor-arg>
+			</bean>
+		</property>
+	</bean>
+	<!-- 数据源 -->
+	<jee:jndi-lookup id="ds" jndi-name="java:/comp/env/jdbc/sapx86DS" />
+
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="ds" />
+		<property name="configLocation" value="classpath:mybatis/mybatis.xml" />
+		<property name="mapperLocations" value="classpath:mybatis/mappers/*Mapper.xml" />
+		<property name="typeAliasesPackage" value="com.bocsoft.sap.base.entity" />
+	</bean>
+
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<!-- 自动扫描装配dao -->
+		<property name="basePackage" value="com.bocsoft.sap.base.mapper" />
+		<property name="annotationClass" value="org.springframework.stereotype.Repository" />
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+	</bean>
+</beans>

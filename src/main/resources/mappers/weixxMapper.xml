@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+<!--执行增加操作的SQL语句。id和parameterType 分别与WeixxMapper接口中的addWeixx方法的名字和 参数类型一致。 
+	以#{username}的形式引用Weixx参数 的username属性，MyBatis将使用反射读取Weixx参数 的此属性。 
+	#{username}中username大小写敏感。引用其他 的gender等属性与此一致。
+	seGeneratedKeys设置 为"true"表明要MyBatis获取由数据库自动生成的主键；
+	keyProperty="id"指定把获取到的主键值注入到Weixx的id属性 -->
+
+<mapper namespace="com.wxx.mapper.WeixxMapper">
+	<!-- 当表中字段名跟实体类字段名不一致 或 为了返回list类型 而定义的returnMap -->
+	<resultMap type="Weixx" id="resultListWeixx">
+		<id column="id" property="id" />
+		<result column="userid" property="userid" />
+		<result column="username" property="username" />
+	</resultMap>
+
+	<!-- 场景:在读取某个用户发表的所有文章。当然还是需要在 WeixxMapper.xml 里面配置 select 语句, 但重点是这个 select 的 
+		resultMap 对应什么样的数据呢。这是重点，这里要引入 association 看定义如下 这样配置之后，就可以了，将 select 语句与 
+		resultMap 对应的映射结合起来看，就明白了。用 association 来 得到关联的用户，这是多对一的情况，因为所有的文章都是同一个用户的。 -->
+	<resultMap id="resultWeixxArticleList" type="Article">
+		<id property="id" column="aid" />
+		<result property="title" column="title" />
+		<result property="content" column="content" />
+		<association property="weixx" javaType="Weixx">
+			<id property="id" column="id" />
+			<result property="userid" column="userid" />
+			<result property="username" column="username" />
+		</association>
+	</resultMap>
+	<!-- 还有另外一种处理方式，可以复用我们前面已经定义好的 resultMap ,前面我们定义过一个 resultListUser ,看这 第二种方法如何实现:将 
+		association 中对应的映射独立抽取出来，可以达到复用的目的。 -->
+	<resultMap id="resultWeixxArticleList2" type="Article">
+		<id property="id" column="aid" />
+		<result property="title" column="title" />
+		<result property="content" column="content" />
+		<association property="weixx" javaType="Weixx" resultMap="resultListWeixx" />
+	</resultMap>
+
+	<insert id="addWeixx" parameterType="Weixx" useGeneratedKeys="true"
+		keyProperty="id">
+		insert into weixx(id,userid,username)
+		values(#{id},#{userid},#{username})
+	</insert>
+
+	<select id="selectWeixxById" parameterType="String" resultType="Weixx">
+		select * from weixx where id = #{id}
+	</select>
+
+	<!-- 返回list 的select 语句，注意 resultMap 的值是指向前面定义好的 -->
+	<select id="selectWeixxs" parameterType="string" resultMap="resultListWeixx">
+		select * from weixx where userName like #{userName}
+	</select>
+
+	<update id="updateWeixx" parameterType="Weixx">
+		update weixx set
+		userid=#{userid},username=#{username}
+		where id=#{id}
+	</update>
+
+	<delete id="deleteWeixx" parameterType="String">
+		delete from weixx where id=#{id}
+	</delete>
+
+	<!-- Mybatis 自带的多个参数传递方法 这个时候没有 parameterType, 但用到了类似 #{param1} 类似的参数 -->
+	<select id="selectWeixxByIu" resultType="Weixx">
+		select * from weixx where id = #{param1} and username=#{param2}
+	</select>
+
+	<!-- 利用 hashMap 传递多个参数 -->
+	<select id="selectWeixxByMap" parameterType="map" resultType="Weixx">
+		select * from weixx where id = #{id} and username=#{username}
+	</select>
+
+	<select id="getWeixxArticles" parameterType="String"
+		resultMap="resultWeixxArticleList">
+		select weixx.id,weixx.userid,weixx.username,article.id
+		aid,article.title,article.content from weixx,article
+		where
+		weixx.id=article.userid and weixx.id=#{id}
+	</select>
+
+	<select id="getWeixxArticles2" parameterType="String"
+		resultMap="resultWeixxArticleList">
+		select weixx.id,weixx.userid,weixx.username,article.id
+		aid,article.title,article.content from weixx,article
+		where
+		weixx.id=article.userid and weixx.id=#{id}
+	</select>
+
+	<select id="getAllWeixx" resultType="Weixx">
+		select
+		weixx.id,weixx.userid,weixx.username,article.id
+		aid,article.title,article.content from weixx,article
+		where
+		weixx.id=article.userid and weixx.id=#{id}
+	</select>
+</mapper>
